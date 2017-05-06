@@ -167,5 +167,4 @@ async def on_ready():
     print("Logged in as {} ({})".format(client.user.name, client.user.id))
     Items.INV_TASK = client.loop.create_task(worker(Items.INV_QUEUE, Utils.invite_user, 2, 60.0))
 
-client.run("mfa.q8PZIZm7cCpWFBAnscsYZkY3aWYgXcR9994s4xnTq9WW3WDtS-_TdDiZ5Kq2AHxPHy11XaBNxPkjzaWg0A3K", bot=False) #gitignore
 client.run("TOKEN", bot=False)
