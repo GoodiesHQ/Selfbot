@@ -1,6 +1,7 @@
 class Settings:
     # The prefix used for executing all commands
     PREFIX = "./"
+    DELETE_CMD = True               # Deletes the original message executing the command
 
     # Message Spamming:
     SPAM_CNT = 10                   # Number of messages to spam

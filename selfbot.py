@@ -21,16 +21,18 @@ class Utils:
     ALL_COMMANDS = ["say", "spam", "invite", "purge",]
 
     @staticmethod
-    def should_invite(userid):
+    def user_invited(userid):
         if not os.path.isfile(Settings.INVITE_DB):
             invites = set()
             with open(Settings.INVITE_DB, "wb") as db:
                 pickle.dump(invites, db)
         with open(Settings.INVITE_DB, "rb") as db:
             invites = pickle.load(db)
-            assert isinstance(invites, set)
-        return user.id in invites pr user.id in Items.INV_SET
+            return userid in invites
 
+    @staticmethod
+    def should_invite(userid):
+        return not bool(Utils.user_invited(userid) or userid in Items.INV_SET)
 
     @staticmethod
     def escape(msg):
@@ -54,11 +56,13 @@ class Utils:
 
     @staticmethod
     async def invite_user(message, user):
-        msg = Settings.INVITE_MSG.format(username=user.name, servername=server.name, link=link)
-        await client.send_message(user, msg)
+        await client.send_message(user, Settings.INVITE_MSG.format(username=user.name, servername=server.name, link=link))
+        with suppress(KeyError):
+            Items.INV_SET.remove(user.id)
 
 
 async def worker(queue, coro, count:int=1, delay:float=1.0, loop:asyncio.AbstractEventLoop=None):
+    """Creates an asynchronous worker task. Sort of simulates how I imagine an async pool would look"""
     if count <= 0:
         raise RuntimeError("count must be > 0")
     loop = loop or asyncio.get_event_loop()
@@ -85,7 +89,6 @@ class Commands:
     async def spam(message, args):
         msg = ' '.join(args) if args else Settings.SPAM_MSG
         msg = Utils.escape(msg)
-
         for i in range(Settings.SPAM_CNT):
             await client.send_message(message.channel, msg)
             await asyncio.sleep(Settings.SPAM_DELAY)
@@ -98,20 +101,6 @@ class Commands:
                 args = (message, user)
                 kwargs = dict()
                 await Items.INV_QUEUE.put((args, kwargs))
-
-        async def send_invite(user, server, link, sem):
-                await asyncio.sleep(Settings.INVITE_DELAY)
-
-        if Items.INVITE.locked():
-            msg = "Invites are still running!"
-            print(msg)
-            await asyncio,send_message(message.channel, msg)
-            return
-
-        async with Items.INVITE:
-            sem = asyncio.BoundedSemaphore(Settings.INVITE_CONNS)
-            link = Settings.INVITE_LINK if not args else args[0]
-            await asyncio.gather(*[send_invite(user, message.server, link, sem) for user in message.server.members])
 
     @staticmethod
     async def purge(message, args):
@@ -137,17 +126,14 @@ async def handle(command, message, coro):
     "A coroutine that handles commands by executing the provided coro"
     if cmd(message, command):
         await coro(message, cmd_args(message, command))
-        return True
     return False
 
 # Various message handlers that can be used in different contexts
 async def private_message(message):
     assert message.server is None
-    await handle("say", message, Commands.say)
 
 async def server_message(message):
     assert message.server is not None
-    await handle("say", message, Commands.say)
 
 async def selfbot_private_message(message):
     assert message.server is None and message.author == client.user
@@ -162,6 +148,10 @@ async def selfbot_server_message(message):
 
 @client.event
 async def on_message(message):
+    if not any(message.content.startswith(Utils.prefixed(cmd)) for cmd in Utils.ALL_COMMANDS):
+        return
+    if Settings.DELETE_CMD is True:
+        await Commands.purge(message, ("1",))
     if message.server is not None:
         if message.author == client.user:
             await selfbot_server_message(message)
@@ -170,10 +160,12 @@ async def on_message(message):
         if message.author == client.user:
             await selfbot_private_message(message)
         await private_message(message)
+    return True
 
 @client.event
 async def on_ready():
     print("Logged in as {} ({})".format(client.user.name, client.user.id))
-    Items.INV_TASK = client.loop.create_task(worker(Items.INV_QUEUE, invite_user, 2, 60.0))
+    Items.INV_TASK = client.loop.create_task(worker(Items.INV_QUEUE, Utils.invite_user, 2, 60.0))
 
+client.run("mfa.q8PZIZm7cCpWFBAnscsYZkY3aWYgXcR9994s4xnTq9WW3WDtS-_TdDiZ5Kq2AHxPHy11XaBNxPkjzaWg0A3K", bot=False) #gitignore
 client.run("TOKEN", bot=False)
