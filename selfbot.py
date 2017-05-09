@@ -18,7 +18,7 @@ class Items:
 
 class Utils:
     """Various utilities used throughout the program"""
-    ALL_COMMANDS = ["say", "spam", "invite", "purge",]
+    ALL_COMMANDS = ["say", "spam", "invite", "purge", "avatar"]
 
     @staticmethod
     def user_invited(userid):
@@ -111,8 +111,14 @@ class Commands:
             if cnt == 0:
                 break
             if msg.author == client.user:
-                await client.delete_message(msg)
                 cnt -= 1
+
+    @staticmethod
+    async def avatar(message, args):
+        for user in message.mentions:
+            url = user.avatar_url
+            if url:
+                await client.send_message(message.channel, "<@!{}>\n{}".format(user.id, url));
 
 def cmd(message, command):
     """Returns true if the message 'message' is executing the command 'command'"""
@@ -139,12 +145,14 @@ async def selfbot_private_message(message):
     assert message.server is None and message.author == client.user
     await handle("spam", message, Commands.spam)
     await handle("purge", message, Commands.purge)
+    await handle("avatar", message, Commands.avatar)
 
 async def selfbot_server_message(message):
     assert message.server is not None and message.author == client.user
     await handle("spam", message, Commands.spam)
     await handle("invite", message, Commands.invite)
     await handle("purge", message, Commands.purge)
+    await handle("avatar", message, Commands.avatar)
 
 @client.event
 async def on_message(message):
@@ -167,4 +175,4 @@ async def on_ready():
     print("Logged in as {} ({})".format(client.user.name, client.user.id))
     Items.INV_TASK = client.loop.create_task(worker(Items.INV_QUEUE, Utils.invite_user, 2, 60.0))
 
-client.run("TOKEN", bot=False)
+# client.run("TOKEN", bot=False)
