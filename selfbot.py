@@ -18,7 +18,7 @@ class Items:
 
 class Utils:
     """Various utilities used throughout the program"""
-    ALL_COMMANDS = ["say", "spam", "invite", "purge", "avatar"]
+    ALL_COMMANDS = ["say", "spam", "invite", "moderate", "purge", "avatar",]
 
     @staticmethod
     def user_invited(userid):
@@ -103,6 +103,17 @@ class Commands:
                 await Items.INV_QUEUE.put((args, kwargs))
 
     @staticmethod
+    async def moderate(message, args):
+        cnt = Utils.trycast(int, args[0], 0) if args else 0
+        if cnt <= 0:
+            return
+        async for msg in client.logs_from(message.channel, limit=cnt):
+            try:
+                await client.delete_message(msg)
+            except Exception as e:
+                print(e)
+
+    @staticmethod
     async def purge(message, args):
         cnt = Utils.trycast(int, args[0], Settings.PURGE_CNT) if args else Settings.PURGE_CNT
         if cnt <= 0:
@@ -111,6 +122,10 @@ class Commands:
             if cnt == 0:
                 break
             if msg.author == client.user:
+                try:
+                    await client.delete_message(msg)
+                except Exception as e:
+                    print(e)
                 cnt -= 1
 
     @staticmethod
@@ -151,6 +166,7 @@ async def selfbot_server_message(message):
     assert message.server is not None and message.author == client.user
     await handle("spam", message, Commands.spam)
     await handle("invite", message, Commands.invite)
+    await handle("moderate", message, Commands.moderate)
     await handle("purge", message, Commands.purge)
     await handle("avatar", message, Commands.avatar)
 
