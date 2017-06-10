@@ -14,11 +14,13 @@ class Items:
     INV_LOCK = asyncio.Lock()
     INV_QUEUE = asyncio.Queue()
     INV_SET = set()
-    INC_TASK = None
+    INV_TASK = None
+    TYPING_TASKS = {}
+
 
 class Utils:
     """Various utilities used throughout the program"""
-    ALL_COMMANDS = ["say", "spam", "invite", "moderate", "purge", "avatar",]
+    ALL_COMMANDS = ["say", "spam", "invite", "moderate", "purge", "avatar", "typing",]
 
     @staticmethod
     def user_invited(userid):
@@ -60,6 +62,10 @@ class Utils:
         with suppress(KeyError):
             Items.INV_SET.remove(user.id)
 
+    @staticmethod
+    async def start_typing(server):
+        await client.send_typing(server)
+        Items.TYPING_TASKS[server.id] = client.loop.create_task(Utils.start_typing(server))
 
 async def worker(queue, coro, count:int=1, delay:float=1.0, loop:asyncio.AbstractEventLoop=None):
     """Creates an asynchronous worker task. Sort of simulates how I imagine an async pool would look"""
@@ -105,11 +111,16 @@ class Commands:
     @staticmethod
     async def moderate(message, args):
         cnt = Utils.trycast(int, args[0], 0) if args else 0
+        mentions = message.mentions or None
         if cnt <= 0:
             return
-        async for msg in client.logs_from(message.channel, limit=cnt):
+        async for msg in client.logs_from(message.channel, limit=9999):
             try:
-                await client.delete_message(msg)
+                if mentions is None or msg.author in mentions:
+                    await client.delete_message(msg)
+                    cnt -= 1
+                if cnt == 0:
+                    break
             except Exception as e:
                 print(e)
 
@@ -134,6 +145,14 @@ class Commands:
             url = user.avatar_url
             if url:
                 await client.send_message(message.channel, "<@!{}>\n{}".format(user.id, url));
+
+    @staticmethod
+    async def typing(message, arg):
+        if message.server.id in Items.TYPING_TASKS:
+            Items.TYPING_TASKS[message.server.id].cancel()
+            del Items.TYPING_TASKS[message.server.id]
+        else:
+            Items.TYPING_TASKS[message.server.id] = client.loop.create_task(Utils.start_typing(message.server))
 
 def cmd(message, command):
     """Returns true if the message 'message' is executing the command 'command'"""
@@ -169,6 +188,7 @@ async def selfbot_server_message(message):
     await handle("moderate", message, Commands.moderate)
     await handle("purge", message, Commands.purge)
     await handle("avatar", message, Commands.avatar)
+    await handle("typing", message, Commands.typing)
 
 @client.event
 async def on_message(message):
