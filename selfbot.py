@@ -20,7 +20,8 @@ class Items:
 
 class Utils:
     """Various utilities used throughout the program"""
-    ALL_COMMANDS = ["say", "spam", "invite", "moderate", "purge", "avatar", "typing",]
+
+    ALL_COMMANDS = ["tag", "say", "spam", "invite", "moderate", "purge", "avatar", "typing",]
 
     @staticmethod
     def user_invited(userid):
@@ -84,6 +85,29 @@ async def worker(queue, coro, count:int=1, delay:float=1.0, loop:asyncio.Abstrac
 
 
 class Commands:
+    @staticmethod
+    async def tag(message, args):
+        if not len(args):
+            return
+
+        MAX_LEN = 1500
+        cur_msg = ""
+        items = {
+            "all": message.server.members,
+            "roles": message.server.role_hierarchy,
+        }.get(args[0], None)
+
+        if items is None:
+            return
+
+        for item in items:
+            if len(cur_msg) + len(item.mention) + 1 >= MAX_LEN:
+                await client.send_message(message.channel, cur_msg)
+                cur_msg = ""
+            cur_msg += item.mention + " "
+        if cur_msg:
+            await client.send_message(message.channel, cur_msg)
+
     @staticmethod
     async def say(message, args):
         msg = ' '.join(args) if args else ""
@@ -189,6 +213,7 @@ async def selfbot_server_message(message):
     await handle("purge", message, Commands.purge)
     await handle("avatar", message, Commands.avatar)
     await handle("typing", message, Commands.typing)
+    await handle("tag", message, Commands.tag)
 
 @client.event
 async def on_message(message):
