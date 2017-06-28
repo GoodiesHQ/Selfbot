@@ -6,6 +6,7 @@ import asyncio
 import discord
 import os
 import pickle
+import string
 
 client = discord.Client()  # "Do not use global variables" - NSA Programming Recommendations
 
@@ -21,7 +22,9 @@ class Items:
 class Utils:
     """Various utilities used throughout the program"""
 
-    ALL_COMMANDS = ["tag", "say", "spam", "invite", "moderate", "purge", "avatar", "typing",]
+    ALL_COMMANDS = ["tag", "say", "spam", "invite", "moderate", "purge", "avatar", "typing", "react"]
+    LETTER_EMOJIS = {'a': '🇦', 'b': '🇧', 'c': '🇨', 'd': '🇩', 'e': '🇪', 'f': '🇫', 'g': '🇬', 'h': '🇭', 'i': '🇮', 'j': '🇯', 'k': '🇰', 'l': '🇱', 'm': '🇲', 'n': '🇳', 'o': '🇴', 'p': '🇵', 'q': '🇶', 'r': '🇷', 's': '🇸', 't': '🇹', 'u': '🇺', 'v': '🇻', 'w': '🇼', 'x': '🇽', 'y': '🇾', 'z': '🇿'}
+
 
     @staticmethod
     def user_invited(userid):
@@ -82,7 +85,6 @@ async def worker(queue, coro, count:int=1, delay:float=1.0, loop:asyncio.Abstrac
             await asyncio.gather(*tasks, loop=loop)
             tasks = []
         await asyncio.sleep(delay)
-
 
 class Commands:
     @staticmethod
@@ -178,6 +180,21 @@ class Commands:
         else:
             Items.TYPING_TASKS[message.server.id] = client.loop.create_task(Utils.start_typing(message.server))
 
+    @staticmethod
+    async def react(message, args):
+        if len(args) == 0:
+            return
+        async for msg in client.logs_from(message.channel, limit=1, before=message):
+            for c in ''.join(args):
+                emoji = Utils.LETTER_EMOJIS.get(c, None)
+                if not emoji:
+                    continue
+                try:
+                    await client.add_reaction(msg, emoji)
+                except:
+                    pass
+
+
 def cmd(message, command):
     """Returns true if the message 'message' is executing the command 'command'"""
     return message.content.startswith(Utils.prefixed(command))
@@ -204,6 +221,9 @@ async def selfbot_private_message(message):
     await handle("spam", message, Commands.spam)
     await handle("purge", message, Commands.purge)
     await handle("avatar", message, Commands.avatar)
+    await handle("react", message, Commands.react)
+    if Settings.DELETE_CMD is True:
+        await Commands.purge(message, ("1",))
 
 async def selfbot_server_message(message):
     assert message.server is not None and message.author == client.user
@@ -214,13 +234,14 @@ async def selfbot_server_message(message):
     await handle("avatar", message, Commands.avatar)
     await handle("typing", message, Commands.typing)
     await handle("tag", message, Commands.tag)
+    await handle("react", message, Commands.react)
+    if Settings.DELETE_CMD is True:
+        await Commands.purge(message, ("1",))
 
 @client.event
 async def on_message(message):
     if not any(message.content.startswith(Utils.prefixed(cmd)) for cmd in Utils.ALL_COMMANDS):
         return
-    if Settings.DELETE_CMD is True:
-        await Commands.purge(message, ("1",))
     if message.server is not None:
         if message.author == client.user:
             await selfbot_server_message(message)
