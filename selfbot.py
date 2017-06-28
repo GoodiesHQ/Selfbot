@@ -185,7 +185,7 @@ class Commands:
         if len(args) == 0:
             return
         async for msg in client.logs_from(message.channel, limit=1, before=message):
-            for c in ''.join(args):
+            for c in ''.join(args).lower():
                 emoji = Utils.LETTER_EMOJIS.get(c, None)
                 if not emoji:
                     continue
