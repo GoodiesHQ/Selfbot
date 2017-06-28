@@ -223,7 +223,9 @@ async def selfbot_private_message(message):
     await handle("avatar", message, Commands.avatar)
     await handle("react", message, Commands.react)
     if Settings.DELETE_CMD is True:
-        await Commands.purge(message, ("1",))
+        try:
+            await client.delete_message(message)
+        except: pass
 
 async def selfbot_server_message(message):
     assert message.server is not None and message.author == client.user
@@ -236,7 +238,9 @@ async def selfbot_server_message(message):
     await handle("tag", message, Commands.tag)
     await handle("react", message, Commands.react)
     if Settings.DELETE_CMD is True:
-        await Commands.purge(message, ("1",))
+        try:
+            await client.delete_message(message)
+        except: pass
 
 @client.event
 async def on_message(message):
