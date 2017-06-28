@@ -22,7 +22,7 @@ class Items:
 class Utils:
     """Various utilities used throughout the program"""
 
-    ALL_COMMANDS = ["tag", "say", "spam", "invite", "moderate", "purge", "avatar", "typing", "react"]
+    ALL_COMMANDS = ["tag", "say", "spam", "invite", "moderate", "purge", "avatar", "typing", "react", "discrim"]
     LETTER_EMOJIS = {'a': '🇦', 'b': '🇧', 'c': '🇨', 'd': '🇩', 'e': '🇪', 'f': '🇫', 'g': '🇬', 'h': '🇭', 'i': '🇮', 'j': '🇯', 'k': '🇰', 'l': '🇱', 'm': '🇲', 'n': '🇳', 'o': '🇴', 'p': '🇵', 'q': '🇶', 'r': '🇷', 's': '🇸', 't': '🇹', 'u': '🇺', 'v': '🇻', 'w': '🇼', 'x': '🇽', 'y': '🇾', 'z': '🇿'}
 
 
@@ -118,6 +118,16 @@ class Commands:
             await client.send_message(message.channel, msg)
 
     @staticmethod
+    async def discrim(message, args):
+        author = message.author
+        disc = lambda m: m.discriminator
+        client_disc = disc(client.user)
+        users = [user for user in client.get_all_members() if disc(user) == client_disc and user != client.user]
+        description = '\n'.join("{}#{}".format(user.name, disc(user)) for user in users)
+        embed = discord.Embed(name="Collisions", description=description, color=discord.Color(0x42d9f4))
+        await client.send_message(message.channel, embed=embed)
+
+    @staticmethod
     async def spam(message, args):
         msg = ' '.join(args) if args else Settings.SPAM_MSG
         msg = Utils.escape(msg)
@@ -155,7 +165,7 @@ class Commands:
         cnt = Utils.trycast(int, args[0], Settings.PURGE_CNT) if args else Settings.PURGE_CNT
         if cnt <= 0:
             return
-        async for msg in client.logs_from(message.channel, limit=9999):
+        async for msg in client.logs_from(message.channel, before=message, limit=9999):
             if cnt == 0:
                 break
             if msg.author == client.user:
@@ -222,6 +232,7 @@ async def selfbot_private_message(message):
     await handle("purge", message, Commands.purge)
     await handle("avatar", message, Commands.avatar)
     await handle("react", message, Commands.react)
+    await handle("discrim", message, Commands.discrim)
     if Settings.DELETE_CMD is True:
         try:
             await client.delete_message(message)
@@ -237,6 +248,7 @@ async def selfbot_server_message(message):
     await handle("typing", message, Commands.typing)
     await handle("tag", message, Commands.tag)
     await handle("react", message, Commands.react)
+    await handle("discrim", message, Commands.discrim)
     if Settings.DELETE_CMD is True:
         try:
             await client.delete_message(message)
