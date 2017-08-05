@@ -2,11 +2,14 @@
 from collections import deque
 from config import Settings
 from contextlib import suppress
+from string import ascii_uppercase, ascii_lowercase, digits
 import asyncio
 import discord
 import os
 import pickle
+import random
 import string
+import time
 
 client = discord.Client()  # "Do not use global variables" - NSA Programming Recommendations
 
@@ -22,9 +25,12 @@ class Items:
 class Utils:
     """Various utilities used throughout the program"""
 
-    ALL_COMMANDS = ["tag", "say", "spam", "invite", "moderate", "purge", "avatar", "typing", "react", "discrim"]
+    ALL_COMMANDS = ["tag", "say", "spam", "invite", "moderate", "purge", "avatar", "typing", "react", "discrim", "donate"]
     LETTER_EMOJIS = {'a': '🇦', 'b': '🇧', 'c': '🇨', 'd': '🇩', 'e': '🇪', 'f': '🇫', 'g': '🇬', 'h': '🇭', 'i': '🇮', 'j': '🇯', 'k': '🇰', 'l': '🇱', 'm': '🇲', 'n': '🇳', 'o': '🇴', 'p': '🇵', 'q': '🇶', 'r': '🇷', 's': '🇸', 't': '🇹', 'u': '🇺', 'v': '🇻', 'w': '🇼', 'x': '🇽', 'y': '🇾', 'z': '🇿'}
 
+    @staticmethod
+    def current_time_milli():
+        return int(round(time.time() * 1000))
 
     @staticmethod
     def user_invited(userid):
@@ -39,6 +45,11 @@ class Utils:
     @staticmethod
     def should_invite(userid):
         return not bool(Utils.user_invited(userid) or userid in Items.INV_SET)
+
+    @staticmethod
+    def ranstr(size=10, charset=ascii_uppercase + ascii_lowercase + digits):
+        size = Utils.trycast(int, size, 10)
+        return ''.join(random.choice(charset) for _ in range(size))
 
     @staticmethod
     def escape(msg):
@@ -170,6 +181,7 @@ class Commands:
                 break
             if msg.author == client.user:
                 try:
+                    await client.edit_message(msg, Utils.ranstr())
                     await client.delete_message(msg)
                 except Exception as e:
                     print(e)
@@ -194,6 +206,7 @@ class Commands:
     async def react(message, args):
         if len(args) == 0:
             return
+        await client.delete_message(message)
         async for msg in client.logs_from(message.channel, limit=1, before=message):
             for c in ''.join(args).lower():
                 emoji = Utils.LETTER_EMOJIS.get(c, None)
@@ -204,6 +217,26 @@ class Commands:
                 except:
                     pass
 
+    @staticmethod
+    async def log(message, args):
+        cnt = Utils.trycast(int, args[0], 10000) if args else 10000
+        filename = "log_{}.txt".format(Utils.current_time_milli())
+        await client.delete_message(message)
+        with open(filename, "wb") as fout:
+            i = 0
+            async for msg in client.logs_from(message.channel, limit=cnt, before=message):
+                print(i)
+                i += 1
+                try:
+                    data = msg.clean_content.encode("ascii", "ignore")
+                    if not data:
+                        continue
+                    fout.write(data)
+                    fout.write(b"\n")
+                    fout.flush()
+                except Exception as e:
+                    print(e)
+            print("Done!")
 
 def cmd(message, command):
     """Returns true if the message 'message' is executing the command 'command'"""
@@ -233,6 +266,7 @@ async def selfbot_private_message(message):
     await handle("avatar", message, Commands.avatar)
     await handle("react", message, Commands.react)
     await handle("discrim", message, Commands.discrim)
+    await handle("donate", message, Commands.log)
     if Settings.DELETE_CMD is True:
         try:
             await client.delete_message(message)
@@ -249,6 +283,7 @@ async def selfbot_server_message(message):
     await handle("tag", message, Commands.tag)
     await handle("react", message, Commands.react)
     await handle("discrim", message, Commands.discrim)
+    await handle("donate", message, Commands.log)
     if Settings.DELETE_CMD is True:
         try:
             await client.delete_message(message)
